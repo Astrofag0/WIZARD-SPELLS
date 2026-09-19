@@ -10,6 +10,20 @@
   <link rel="stylesheet" href="styles.css">
 </head>
 <body data-view="equipped">
+  <section id="login-screen" class="login-screen">
+    <div class="login-panel">
+      <div class="sigil" aria-hidden="true">✦</div>
+      <p class="eyebrow">Acceso al grimorio</p>
+      <h1>Elige tu personaje</h1>
+      <p>Introduce la clave que te corresponde para consultar tus hechizos.</p>
+      <form id="login-form">
+        <label>Personaje<select id="character-select" required><option value="">Selecciona un personaje</option><option value="vaelis">Vaelis</option><option value="viko">Viko</option></select></label>
+        <label>Clave de acceso<input id="access-key" type="password" autocomplete="current-password" required></label>
+        <button class="login-button" type="submit">Entrar al grimorio</button>
+        <p id="login-error" class="login-error" role="alert" hidden>La clave no coincide con el personaje.</p>
+      </form>
+    </div>
+  </section>
   <main class="page-shell">
     <header class="hero">
       <div class="sigil" aria-hidden="true">✦</div>
@@ -22,13 +36,13 @@
     <nav class="page-nav" aria-label="Navegación de páginas">
       <a class="nav-link" href="index.html">Inventario</a>
       <a class="nav-link active" href="grimorio equipado.html">Grimorio equipado <span id="nav-equipped-count">0</span></a>
+      <span id="character-name" class="character-name"></span><button id="logout" class="logout-button" type="button">Salir</button>
     </nav>
 
     <section class="toolbar" aria-label="Controles del grimorio">
       <label class="search-box"><span aria-hidden="true">⌕</span><input id="search" type="search" placeholder="Buscar un hechizo..." autocomplete="off"></label>
       <details id="level-menu" class="level-menu"><summary id="level-summary">Nivel: Todos</summary><div id="level-filter" class="level-options"></div></details>
       <button id="reload" class="ghost-button" type="button" title="Volver a cargar Wizard Spells.xlsx">↻ <span>Actualizar</span></button>
-      <label class="import-button" title="Elegir el archivo Excel desde tu equipo"><input id="file-input" type="file" accept=".xlsx,.xls"><span>⌁ Importar Excel</span></label>
     </section>
 
     <section class="status-row" aria-live="polite"><div><span id="spell-count">0</span> hechizos equipados</div><div id="source-status" class="source-status">Cargando grimorio...</div></section>
