@@ -106,6 +106,7 @@ function imageFor(name, ownerId = characterId) {
     heroism: 'heroism.png',
     'lay on hands': 'Lay on hands.png',
     'lesser restoration': 'Lesser Restoration.png', 'lesser restoration restauracion menor': 'Lesser Restoration.png',
+    'locate object': 'Locate Object.png',
     'magic weapon': 'Magic weapon.png',
     'prayer of healing': 'Prayer of healing.png',
     'protection from evil and good': 'protection from evile and good.png',
