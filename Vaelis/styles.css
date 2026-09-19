@@ -65,9 +65,9 @@ button, .import-button { border: 1px solid var(--line); background: var(--panel)
 .status-row #spell-count { color: var(--plum); font-size: 18px; font-weight: 700; }
 .source-status { text-align: right; }
 .spell-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
-.spell-card { display: grid; grid-template-columns: 103px 1fr; min-height: 242px; background: var(--panel); border: 1px solid var(--line); border-top: 3px solid var(--plum); animation: rise .55s ease-out both; }
+.spell-card { display: grid; grid-template-columns: 180px 1fr; min-height: 280px; background: var(--panel); border: 1px solid var(--line); border-top: 3px solid var(--plum); animation: rise .55s ease-out both; }
 .card-art { position: relative; min-height: 100%; overflow: hidden; background: var(--plum-dark); }
-.card-art img { width: 100%; height: 100%; min-height: 242px; object-fit: cover; opacity: .82; }
+.card-art img { width: 100%; height: 100%; min-height: 280px; object-fit: cover; opacity: .82; }
 .card-art::after { content: ''; position: absolute; inset: 0; background: linear-gradient(90deg, transparent 45%, rgba(54,34,56,.35)); }
 .card-art b { position: absolute; z-index: 1; top: 10px; left: 10px; padding: 4px 6px; background: var(--gold); color: white; font-size: 10px; font-weight: 700; }
 .card-art.no-art { display: grid; place-items: center; color: #d9b16a; font-size: 27px; }
@@ -81,6 +81,11 @@ button, .import-button { border: 1px solid var(--line); background: var(--panel)
 .card-footer { display: flex; align-items: flex-end; justify-content: space-between; gap: 8px; margin-top: 13px; }
 .tags { display: flex; flex-wrap: wrap; gap: 5px; }
 .tags span { padding: 4px 7px; color: var(--plum); background: #f3e2dc; font-size: 9px; }
+.owner-tag { color: #fff !important; background: var(--gold) !important; }
+.character-menu { display: none; }
+body.dm-mode .character-menu { display: block; }
+body.dm-mode .page-nav .nav-link { display: none; }
+body.dm-mode .page-nav { justify-content: flex-end; }
 .choice { display: flex; flex-shrink: 0; gap: 4px; }
 .choice-button { min-width: 34px; padding: 5px 7px; border: 1px solid var(--line); background: transparent; color: var(--muted); font: 700 10px 'DM Sans', sans-serif; cursor: pointer; }
 .choice-button.yes.selected { color: #fff; border-color: var(--sage); background: var(--sage); }
@@ -93,4 +98,4 @@ footer { position: relative; padding: 19px; color: var(--muted); border-top: 1px
 footer strong { color: var(--plum); }
 @keyframes rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 @media (max-width: 850px) { .spell-grid { grid-template-columns: repeat(2, 1fr); } }
-@media (max-width: 600px) { .page-shell { width: min(100% - 26px, 480px); padding-top: 42px; } .hero-rule { margin-bottom: 35px; } .toolbar { flex-wrap: wrap; } .search-box { flex-basis: 100%; } .level-box { padding-left: 0; } .spell-grid { grid-template-columns: 1fr; } .spell-card { grid-template-columns: 112px 1fr; } .status-row { align-items: flex-end; } .source-status { max-width: 180px; } .ghost-button span { display: none; } }
+@media (max-width: 600px) { .page-shell { width: min(100% - 26px, 480px); padding-top: 42px; } .hero-rule { margin-bottom: 35px; } .toolbar { flex-wrap: wrap; } .search-box { flex-basis: 100%; } .level-menu { min-width: 140px; } .spell-grid { grid-template-columns: 1fr; } .spell-card { grid-template-columns: 155px 1fr; } .card-art img { min-height: 250px; } .status-row { align-items: flex-end; } .source-status { max-width: 180px; } .ghost-button span { display: none; } }
