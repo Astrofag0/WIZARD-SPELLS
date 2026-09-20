@@ -45,6 +45,15 @@ h1 { margin: 0; color: var(--plum-dark); font-size: clamp(35px, 5vw, 62px); font
 body.dm-mode .dm-tabs { display: flex; }
 .dm-tab { padding: 8px 10px; border: 1px solid var(--line); background: var(--panel); color: var(--plum); font-size: 11px; }
 .dm-tab.active { background: var(--plum); color: #fff; }
+.slot-grid { display: grid; grid-template-columns: repeat(2, minmax(280px, 1fr)); gap: 20px; }
+.slot-panel { padding: 22px; background: var(--panel); border: 1px solid var(--line); border-top: 3px solid var(--plum); }
+.slot-panel h2 { margin: 0 0 18px; color: var(--plum); font-size: 20px; }
+.slot-levels { display: grid; gap: 10px; }
+.slot-row { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 12px 14px; background: rgba(243, 226, 220, .5); border: 1px solid var(--line); }
+.slot-row strong { color: var(--plum-dark); font: 600 14px 'Cinzel', serif; }
+.slot-stars { display: flex; gap: 3px; }
+.slot-stars .star { position: static; color: #a99b94; text-shadow: none; }
+.slot-stars .star.lit { color: #c18b32; }
 .character-name { margin-left: 8px; padding: 9px 12px; color: var(--plum); border-left: 1px solid var(--line); font-size: 11px; font-weight: 700; }
 .logout-button { padding: 8px 10px; border: 1px solid var(--line); background: transparent; color: var(--muted); font-size: 11px; }
 .toolbar { display: flex; align-items: center; gap: 12px; margin-bottom: 19px; padding-bottom: 17px; border-bottom: 1px solid var(--line); }
@@ -108,4 +117,4 @@ footer { position: relative; padding: 19px; color: var(--muted); border-top: 1px
 footer strong { color: var(--plum); }
 @keyframes rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 @media (max-width: 850px) { .spell-grid { grid-template-columns: repeat(2, 1fr); } }
-@media (max-width: 600px) { .page-shell { width: min(100% - 26px, 480px); padding-top: 42px; } .hero-rule { margin-bottom: 35px; } .toolbar { flex-wrap: wrap; } .search-box { flex-basis: 100%; } .level-menu { min-width: 140px; } .spell-grid { grid-template-columns: 1fr; } .spell-card { grid-template-columns: 155px 1fr; } .card-art img { min-height: 250px; } .status-row { align-items: flex-end; } .source-status { max-width: 180px; } .ghost-button span { display: none; } }
+@media (max-width: 600px) { .page-shell { width: min(100% - 26px, 480px); padding-top: 42px; } .hero-rule { margin-bottom: 35px; } .toolbar { flex-wrap: wrap; } .search-box { flex-basis: 100%; } .level-menu { min-width: 140px; } .spell-grid, .slot-grid { grid-template-columns: 1fr; } .spell-card { grid-template-columns: 155px 1fr; } .card-art img { min-height: 250px; } .status-row { align-items: flex-end; } .source-status { max-width: 180px; } .ghost-button span { display: none; } }
