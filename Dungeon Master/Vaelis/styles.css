@@ -78,7 +78,7 @@ body.dm-mode.equipped-mode .dm-only { display: inline-block; }
 .card-art::after { content: ''; position: absolute; inset: 0; background: linear-gradient(90deg, transparent 45%, rgba(54,34,56,.35)); }
 .card-art b { position: absolute; z-index: 1; top: 10px; left: 10px; padding: 4px 6px; background: var(--gold); color: white; font-size: 10px; font-weight: 700; }
 .card-art.no-art { display: grid; place-items: center; color: #d9b16a; font-size: 27px; }
-.stars { position: absolute; z-index: 2; top: 8px; left: 8px; display: flex; gap: 1px; }
+.stars { position: absolute; z-index: 2; top: 8px; left: 50%; display: flex; gap: 1px; transform: translateX(-50%); }
 .star { padding: 0 2px; border: 0; background: transparent; color: rgba(255,255,255,.6); font-size: 18px; line-height: 1; text-shadow: 0 1px 2px #2c1718; }
 .star.lit { color: #f5c95d; }
 .card-content { display: flex; flex-direction: column; padding: 19px 17px 15px; }
