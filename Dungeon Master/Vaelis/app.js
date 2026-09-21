@@ -1,4 +1,7 @@
 const sessionKey = 'wizard-spells-character';
+const supabaseUrl = 'https://jzglyqrwzbtkllfxkeyw.supabase.co';
+const supabaseKey = 'sb_publishable_iqYHWb-RYmbMvVHpiarnfg_oNXCk0q3';
+const supabaseHeaders = { apikey: supabaseKey, Authorization: `Bearer ${supabaseKey}`, 'Content-Type': 'application/json' };
 const view = document.body.dataset.view || 'inventory';
 const characters = {
   frederick: { name: 'Frederick D´Rosectta', key: 'rosas', root: '../Frederick D’Rosectta/', workbook: 'Frederick D´Rosectta.xlsx', imageFolder: 'Imagenes Vampire/', background: 'Fondos Vampire/f8573825-9552-4a6f-8fc9-94c41eec4b08.png' },
@@ -29,8 +32,21 @@ function key(value) { return clean(value).toLocaleLowerCase('es').normalize('NFD
 function escapeHtml(value) { return String(value).replace(/[&<>'"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[c])); }
 function saveSelections() { localStorage.setItem(selectionKey, JSON.stringify(state.selections)); }
 function selectionId(spell) { return `${spell.owner}:${spell.id}`; }
-function approvedByDungeonMaster(spell) { return readJson('wizard-spells-selections-dungeon-master')[selectionId(spell)] === true; }
-function selectedByUser(spell) { return readJson(`wizard-spells-selections-${spell.owner}`)[selectionId(spell)] === true; }
+const remoteSelections = {};
+function approvedByDungeonMaster(spell) { return remoteSelections[selectionId(spell)]?.approved_by_dm === true || readJson('wizard-spells-selections-dungeon-master')[selectionId(spell)] === true; }
+function selectedByUser(spell) { return remoteSelections[selectionId(spell)]?.selected_by_user === true || readJson(`wizard-spells-selections-${spell.owner}`)[selectionId(spell)] === true; }
+async function loadRemoteSelections() {
+  const response = await fetch(`${supabaseUrl}/rest/v1/spell_selections?select=character_id,spell_id,approved_by_dm,selected_by_user`, { headers: supabaseHeaders });
+  if (!response.ok) throw new Error('No se pudieron sincronizar las selecciones');
+  const rows = await response.json();
+  rows.forEach(row => { remoteSelections[`${row.character_id}:${row.spell_id}`] = row; });
+}
+async function saveRemoteSelection(ownerId, spellId, changes) {
+  const payload = { character_id: ownerId, spell_id: spellId, ...changes, updated_at: new Date().toISOString() };
+  const response = await fetch(`${supabaseUrl}/rest/v1/spell_selections?on_conflict=character_id,spell_id`, { method: 'POST', headers: { ...supabaseHeaders, Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify(payload) });
+  if (!response.ok) throw new Error('No se pudo guardar la selección online');
+  remoteSelections[`${ownerId}:${spellId}`] = { ...remoteSelections[`${ownerId}:${spellId}`], ...payload };
+}
 function englishTitle(value) {
   const text = clean(value).replace(/\.png$/i, '').trim();
   if (!text) return '';
@@ -108,6 +124,7 @@ async function load() {
     : [characterId === 'dungeon-master' ? state.activeOwner : characterId];
   const sets = await Promise.all(owners.map(async ownerId => { const owner = characters[ownerId]; const response = await fetch(`${owner.root}${owner.workbook}`); if (!response.ok) throw new Error(owner.name); return parseWorkbook(await response.arrayBuffer(), ownerId); }));
   state.spells = sets.flat();
+  try { await loadRemoteSelections(); } catch (error) { elements.status.textContent = 'Modo local: no se pudo conectar con Supabase'; }
   if (characterId !== 'dungeon-master') { state.spells.forEach(spell => { const id = selectionId(spell); if (!(id in state.selections)) state.selections[id] = false; }); saveSelections(); }
   if (elements.level) populateLevels();
   if (view === 'equipped') populateCharacterFilter();
@@ -145,6 +162,6 @@ if (setupAccess()) {
   elements.characterFilter?.addEventListener('change', event => { const input = event.target.closest('input'); if (!input) return; const all = [...elements.characterFilter.querySelectorAll('input')]; if (input.value === 'all' && input.checked) all.filter(item => item !== input).forEach(item => { item.checked = false; }); if (input.value !== 'all' && input.checked) all.find(item => item.value === 'all').checked = false; state.ownerFilters = all.filter(item => item.checked && item.value !== 'all').map(item => item.value); updateCharacterSummary(); render(); });
   elements.reload?.addEventListener('click', load);
   elements.resetStars?.addEventListener('click', () => { state.stars = {}; localStorage.setItem('wizard-spells-stars', '{}'); if (view === 'slots') renderSlots(); else render(); });
-  elements.grid?.addEventListener('click', event => { const choice = event.target.closest('[data-spell-owner]'); if (choice) { state.selections[`${choice.dataset.spellOwner}:${choice.dataset.spellId}`] = choice.dataset.choice === 'yes'; saveSelections(); render(); return; } const slot = event.target.closest('[data-slot-value]'); if (slot) { state.stars[`${slot.dataset.slotOwner}:${slot.dataset.slotLevel}`] = Number(slot.dataset.slotValue); localStorage.setItem('wizard-spells-stars', JSON.stringify(state.stars)); renderSlots(); } });
+  elements.grid?.addEventListener('click', async event => { const choice = event.target.closest('[data-spell-owner]'); if (choice) { const ownerId = choice.dataset.spellOwner; const spellId = choice.dataset.spellId; const selected = choice.dataset.choice === 'yes'; state.selections[`${ownerId}:${spellId}`] = selected; saveSelections(); try { await saveRemoteSelection(ownerId, spellId, characterId === 'dungeon-master' ? { approved_by_dm: selected } : { selected_by_user: selected }); } catch (error) { elements.status.textContent = 'Guardado local: no se pudo sincronizar'; } render(); return; } const slot = event.target.closest('[data-slot-value]'); if (slot) { state.stars[`${slot.dataset.slotOwner}:${slot.dataset.slotLevel}`] = Number(slot.dataset.slotValue); localStorage.setItem('wizard-spells-stars', JSON.stringify(state.stars)); renderSlots(); } });
   load().then(() => { if (view === 'slots') renderSlots(); }).catch(() => { elements.status.textContent = 'No se pudieron cargar los datos'; elements.empty.hidden = false; });
 }
