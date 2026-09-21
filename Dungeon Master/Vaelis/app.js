@@ -103,18 +103,20 @@ function setupAccess() {
   return Boolean(character);
 }
 async function load() {
-  const owners = characterId === 'dungeon-master' ? Object.keys(characters).filter(id => id !== 'dungeon-master') : [characterId];
+  const owners = characterId === 'dungeon-master' && view === 'equipped'
+    ? Object.keys(characters).filter(id => id !== 'dungeon-master')
+    : [characterId === 'dungeon-master' ? state.activeOwner : characterId];
   const sets = await Promise.all(owners.map(async ownerId => { const owner = characters[ownerId]; const response = await fetch(`${owner.root}${owner.workbook}`); if (!response.ok) throw new Error(owner.name); return parseWorkbook(await response.arrayBuffer(), ownerId); }));
   state.spells = sets.flat();
   if (characterId !== 'dungeon-master') { state.spells.forEach(spell => { const id = selectionId(spell); if (!(id in state.selections)) state.selections[id] = false; }); saveSelections(); }
   if (elements.level) populateLevels();
-  populateCharacterFilter();
+  if (view === 'equipped') populateCharacterFilter();
   renderTabs();
   if (view !== 'slots') render();
   elements.status.textContent = view === 'slots' ? 'Ranuras listas para configurar' : `${filteredSpells().length} hechizos visibles`;
 }
 function populateCharacterFilter() {
-  if (!elements.characterFilter || characterId !== 'dungeon-master') return;
+  if (!elements.characterFilter || characterId !== 'dungeon-master' || view !== 'equipped') return;
   const owners = Object.keys(characters).filter(id => id !== 'dungeon-master');
   state.ownerFilters = [];
   elements.characterFilter.innerHTML = `<label><input type="checkbox" value="all"> <span>Todos</span></label>${owners.map(id => `<label><input type="checkbox" value="${id}"> <span>${escapeHtml(characters[id].name)}</span></label>`).join('')}`;
@@ -128,7 +130,7 @@ function renderTabs() {
   if (!elements.tabs) return;
   elements.tabs.innerHTML = '';
   if (characterId !== 'dungeon-master') return;
-  Object.keys(characters).filter(id => id !== 'dungeon-master').forEach(id => { const tab = document.createElement('button'); tab.className = `dm-tab ${state.activeOwner === id && view !== 'equipped' ? 'active' : ''}`; tab.textContent = characters[id].name; tab.onclick = () => { sessionStorage.setItem('wizard-spells-active-owner', id); if (view === 'equipped') window.location.href = 'index.html'; else { state.activeOwner = id; renderTabs(); render(); } }; elements.tabs.appendChild(tab); });
+  Object.keys(characters).filter(id => id !== 'dungeon-master').forEach(id => { const tab = document.createElement('button'); tab.className = `dm-tab ${state.activeOwner === id && view !== 'equipped' ? 'active' : ''}`; tab.textContent = characters[id].name; tab.onclick = () => { sessionStorage.setItem('wizard-spells-active-owner', id); if (view === 'equipped') window.location.href = 'index.html'; else { state.activeOwner = id; renderTabs(); load(); } }; elements.tabs.appendChild(tab); });
   const equipped = document.createElement('button'); equipped.className = `dm-tab ${view === 'equipped' ? 'active' : ''}`; equipped.textContent = 'Hechizos equipados'; equipped.onclick = () => { window.location.href = 'grimorio equipado.html'; }; elements.tabs.appendChild(equipped);
   const slots = document.createElement('button'); slots.className = `dm-tab ${view === 'slots' ? 'active' : ''}`; slots.textContent = 'Ranuras Hechizo'; slots.onclick = () => { window.location.href = 'ranuras hechizo.html'; }; elements.tabs.appendChild(slots);
 }

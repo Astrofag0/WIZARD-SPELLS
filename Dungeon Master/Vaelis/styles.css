@@ -103,6 +103,7 @@ body.dm-mode.equipped-mode .dm-only { display: inline-block; }
 .owner-tag { color: #fff !important; background: var(--gold) !important; }
 .character-menu { display: none; }
 body.dm-mode .character-menu { display: block; }
+body.dm-mode:not(.equipped-mode) .character-menu { display: none; }
 body.dm-mode .page-nav .nav-link { display: none; }
 body.dm-mode .page-nav { justify-content: flex-end; }
 .choice { display: flex; flex-shrink: 0; gap: 4px; }
