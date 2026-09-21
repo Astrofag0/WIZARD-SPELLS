@@ -41,6 +41,17 @@ async function loadRemoteSelections() {
   const rows = await response.json();
   rows.forEach(row => { remoteSelections[`${row.character_id}:${row.spell_id}`] = row; });
 }
+async function ensureRemoteRows(spells) {
+  if (characterId !== 'dungeon-master') return;
+  const existing = new Set(Object.keys(remoteSelections));
+  const missing = spells.filter(spell => !existing.has(selectionId(spell))).map(spell => ({ character_id: spell.owner, spell_id: spell.id, approved_by_dm: false, selected_by_user: false }));
+  for (let index = 0; index < missing.length; index += 100) {
+    const batch = missing.slice(index, index + 100);
+    const response = await fetch(`${supabaseUrl}/rest/v1/spell_selections`, { method: 'POST', headers: { ...supabaseHeaders, Prefer: 'return=minimal' }, body: JSON.stringify(batch) });
+    if (!response.ok) throw new Error('No se pudieron crear todas las filas de selección');
+    batch.forEach(row => { remoteSelections[`${row.character_id}:${row.spell_id}`] = row; });
+  }
+}
 async function saveRemoteSelection(ownerId, spellId, changes) {
   const payload = { character_id: ownerId, spell_id: spellId, ...changes, updated_at: new Date().toISOString() };
   const response = await fetch(`${supabaseUrl}/rest/v1/spell_selections?on_conflict=character_id,spell_id`, { method: 'POST', headers: { ...supabaseHeaders, Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify(payload) });
@@ -125,6 +136,7 @@ async function load() {
   const sets = await Promise.all(owners.map(async ownerId => { const owner = characters[ownerId]; const response = await fetch(`${owner.root}${owner.workbook}`); if (!response.ok) throw new Error(owner.name); return parseWorkbook(await response.arrayBuffer(), ownerId); }));
   state.spells = sets.flat();
   try { await loadRemoteSelections(); } catch (error) { elements.status.textContent = 'Modo local: no se pudo conectar con Supabase'; }
+  try { await ensureRemoteRows(state.spells); } catch (error) { elements.status.textContent = 'Supabase conectado parcialmente'; }
   if (characterId !== 'dungeon-master') { state.spells.forEach(spell => { const id = selectionId(spell); if (!(id in state.selections)) state.selections[id] = false; }); saveSelections(); }
   if (elements.level) populateLevels();
   if (view === 'equipped') populateCharacterFilter();
