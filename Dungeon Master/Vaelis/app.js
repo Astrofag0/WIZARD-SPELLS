@@ -358,8 +358,7 @@ function renderCreateView() {
         </label>
         <button id="create-save" class="login-button" type="button">Guardar</button>
       </div>
-    </article>
-    <section class="custom-spell-list">${state.customSpells.map(row => `<article class="custom-spell-item"><span>${escapeHtml(row.name)} · ${escapeHtml(characters[row.owner]?.name || row.owner)}</span><button type="button" class="ghost-button" data-delete-custom="${row.id}">Borrar</button></article>`).join('')}</section>`;
+    </article>`;
   elements.empty.hidden = true;
   document.querySelector('#create-name').addEventListener('input', e => form.name = e.target.value);
   document.querySelector('#create-description').addEventListener('input', e => form.description = e.target.value);
@@ -382,14 +381,12 @@ function renderCreateView() {
     try {
       const [created] = await supaUpsert('custom_spells', { owner: form.owner, name: form.name, description: form.description, type: form.type, level: form.level, range: form.range, effect: form.effect, concentration: form.concentration, image: form.image });
       state.customSpells.push(created);
-      state.createForm = { name: '', description: '', type: 'dano', level: 'Truco', range: '', effect: '', concentration: 'No', owner: form.owner, image: '' };
-      elements.status.textContent = 'Hechizo creado y visible para aprobación en su pestaña';
+      const savedOwner = form.owner;
+      state.createForm = { name: '', description: '', type: 'dano', level: 'Truco', range: '', effect: '', concentration: 'No', owner: savedOwner, image: '' };
+      elements.status.textContent = `Guardado: revisa la pestaña de ${characters[savedOwner].name} para elegir Sí/No y que le aparezca a los demás.`;
       renderCreateView();
     } catch (error) { elements.status.textContent = 'No se pudo guardar el hechizo en Supabase'; }
   });
-  elements.grid.querySelectorAll('[data-delete-custom]').forEach(button => button.addEventListener('click', async () => {
-    try { await supaDelete('custom_spells', { id: button.dataset.deleteCustom }); state.customSpells = state.customSpells.filter(row => String(row.id) !== button.dataset.deleteCustom); renderCreateView(); } catch (error) { elements.status.textContent = 'No se pudo borrar el hechizo'; }
-  }));
 }
 if (setupAccess()) {
   elements.search?.addEventListener('input', event => { state.query = event.target.value; render(); });

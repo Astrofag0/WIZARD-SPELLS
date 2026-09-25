@@ -135,8 +135,6 @@ body.dm-mode .page-nav { justify-content: flex-end; }
 .spell-form textarea { min-height: 70px; resize: vertical; }
 .type-toggle { display: flex; gap: 8px; margin-bottom: 8px; }
 .type-toggle .active { background: var(--plum); color: #fff; }
-.custom-spell-list { display: grid; gap: 8px; }
-.custom-spell-item { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; background: var(--panel); border: 1px solid var(--line); font-size: 12px; }
 .empty-state { padding: 70px 20px; text-align: center; color: var(--muted); }
 .empty-state span { color: var(--gold); font-size: 26px; }
 .empty-state h2 { margin: 13px 0 5px; color: var(--plum); font-size: 22px; }
