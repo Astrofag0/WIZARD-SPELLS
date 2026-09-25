@@ -129,6 +129,7 @@ body.dm-mode .page-nav { justify-content: flex-end; }
 .levels-row .slot-stars .star.lit { color: #c18b32; }
 .levels-actions { display: flex; gap: 10px; }
 .spell-form { grid-template-columns: 220px 1fr; }
+.spell-form .import-button { position: absolute; z-index: 2; left: 10px; right: 10px; bottom: 10px; text-align: center; }
 .spell-form .card-content { gap: 10px; }
 .spell-form input, .spell-form textarea, .spell-form select { display: block; width: 100%; padding: 9px; margin-bottom: 8px; border: 1px solid var(--line); background: #fffdf9; }
 .spell-form textarea { min-height: 70px; resize: vertical; }
