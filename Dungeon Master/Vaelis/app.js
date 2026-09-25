@@ -83,6 +83,7 @@ async function loadCharacterLevels() {
   rows.forEach(row => { state.characterLevels[row.character_id] = { px_level: row.px_level, stars: typeof row.stars === 'string' ? JSON.parse(row.stars || '{}') : (row.stars || {}) }; });
 }
 function spellType(spell) { return remoteSelections[selectionId(spell)]?.spell_type || spell.type; }
+function spellImage(spell) { return spell.image || remoteSelections[selectionId(spell)]?.spell_image || ''; }
 function customSpellToShape(row) {
   return { owner: row.owner, id: `custom-${row.id}`, name: row.name, level: row.level || 'Sin nivel', description: row.description || 'Sin descripción disponible.', dice: row.effect || '', range: row.range || '', concentration: row.concentration || '', duration: '', type: row.type || '', image: row.image || '', custom: true };
 }
@@ -279,7 +280,10 @@ function render() {
     const currentType = spellType(spell);
     const type = typeKey(currentType);
     const typeEditor = characterId === 'dungeon-master' && view === 'equipped' ? `<div class="choice type-choice"><button class="choice-button dano ${type === 'dano' ? 'selected' : ''}" data-type-owner="${spell.owner}" data-type-id="${escapeHtml(spell.id)}" data-type-value="dano">Daño</button><button class="choice-button efecto ${type === 'efecto' ? 'selected' : ''}" data-type-owner="${spell.owner}" data-type-id="${escapeHtml(spell.id)}" data-type-value="efecto">Efecto</button></div>` : '';
-    return `<article class="spell-card"><div class="card-art ${spell.image ? '' : 'no-art'}">${spell.image ? `<img src="${spell.image}" alt="" loading="lazy">` : '<span>✦</span>'}<b>${escapeHtml(spell.level)}</b></div><div class="card-content"><h2>${escapeHtml(spell.name)}</h2>${descriptionMarkup}<div class="card-footer"><div class="tags">${type ? `<span class="type-tag ${type}">${typeLabel(currentType)}</span>` : ''}${characterId === 'dungeon-master' ? `<span class="owner-tag">${escapeHtml(characters[spell.owner].name)}</span>` : ''}</div>${typeEditor}${view !== 'equipped' ? `<div class="choice"><button class="choice-button yes ${choice ? 'selected' : ''}" data-spell-owner="${spell.owner}" data-spell-id="${escapeHtml(spell.id)}" data-spell-level="${escapeHtml(spell.level)}" data-choice="yes">Sí</button><button class="choice-button no ${!choice ? 'selected' : ''}" data-spell-owner="${spell.owner}" data-spell-id="${escapeHtml(spell.id)}" data-spell-level="${escapeHtml(spell.level)}" data-choice="no">No</button></div>` : ''}</div></div></article>`;
+    const image = spellImage(spell);
+    const canUploadImage = characterId === 'dungeon-master' && view === 'inventory' && !image;
+    const uploadMarkup = canUploadImage ? `<div class="card-upload"><label class="import-button">Subir imagen<input type="file" accept="image/*" class="card-image-input" data-image-owner="${spell.owner}" data-image-id="${escapeHtml(spell.id)}"></label><input type="text" class="card-image-url" placeholder="o pega una URL" data-image-owner="${spell.owner}" data-image-id="${escapeHtml(spell.id)}"></div>` : '';
+    return `<article class="spell-card"><div class="card-art ${image ? '' : 'no-art'}">${image ? `<img src="${image}" alt="" loading="lazy">` : `<span>✦</span>${uploadMarkup}`}<b>${escapeHtml(spell.level)}</b></div><div class="card-content"><h2>${escapeHtml(spell.name)}</h2>${descriptionMarkup}<div class="card-footer"><div class="tags">${type ? `<span class="type-tag ${type}">${typeLabel(currentType)}</span>` : ''}${characterId === 'dungeon-master' ? `<span class="owner-tag">${escapeHtml(characters[spell.owner].name)}</span>` : ''}</div>${typeEditor}${view !== 'equipped' ? `<div class="choice"><button class="choice-button yes ${choice ? 'selected' : ''}" data-spell-owner="${spell.owner}" data-spell-id="${escapeHtml(spell.id)}" data-spell-level="${escapeHtml(spell.level)}" data-choice="yes">Sí</button><button class="choice-button no ${!choice ? 'selected' : ''}" data-spell-owner="${spell.owner}" data-spell-id="${escapeHtml(spell.id)}" data-spell-level="${escapeHtml(spell.level)}" data-choice="no">No</button></div>` : ''}</div></div></article>`;
   }).join('');
   elements.empty.hidden = spells.length > 0;
 }
@@ -422,6 +426,27 @@ if (setupAccess()) {
     }
     const slot = event.target.closest('[data-slot-value]');
     if (slot) { state.stars[`${slot.dataset.slotOwner}:${slot.dataset.slotLevel}`] = Number(slot.dataset.slotValue); localStorage.setItem('wizard-spells-stars', JSON.stringify(state.stars)); renderSlots(); }
+  });
+  elements.grid?.addEventListener('change', async event => {
+    const fileInput = event.target.closest('.card-image-input');
+    const urlInput = event.target.closest('.card-image-url');
+    const target = fileInput || urlInput;
+    if (!target) return;
+    const ownerId = target.dataset.imageOwner; const spellId = target.dataset.imageId;
+    const applyImage = async value => {
+      if (!value) return;
+      remoteSelections[`${ownerId}:${spellId}`] = { ...remoteSelections[`${ownerId}:${spellId}`], spell_image: value };
+      render();
+      try { await saveRemoteSelection(ownerId, spellId, { spell_image: value }); } catch (error) { elements.status.textContent = 'No se pudo sincronizar la imagen'; }
+    };
+    if (fileInput) {
+      const file = fileInput.files?.[0]; if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => applyImage(reader.result);
+      reader.readAsDataURL(file);
+    } else {
+      await applyImage(urlInput.value.trim());
+    }
   });
   load().then(() => { if (view === 'slots') renderSlots(); if (view === 'inventory' || view === 'equipped') setInterval(refreshRemote, 5000); }).catch(() => { elements.status.textContent = 'No se pudieron cargar los datos'; elements.empty.hidden = false; });
 }

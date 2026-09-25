@@ -6,6 +6,10 @@
 --    en el resto de pestañas/usuarios para ese mismo hechizo.
 alter table spell_selections add column if not exists spell_type text;
 
+-- 1b) Imagen por hechizo: el Dungeon Master la sube (o pega una URL) desde la pestaña de cada
+--     personaje cuando la tarjeta no tiene imagen, y se refleja para todos los usuarios.
+alter table spell_selections add column if not exists spell_image text;
+
 -- (Opcional) Si ya habías creado antes la tabla "app_state" del filtro global, ya no se usa: puedes borrarla.
 -- drop table if exists app_state;
 

@@ -86,7 +86,10 @@ body.dm-mode.equipped-mode .dm-only { display: inline-block; }
 .image-zoom .card-art img { transform: scale(1.32); object-position: center; }
 .card-art::after { content: ''; position: absolute; inset: 0; background: linear-gradient(90deg, transparent 45%, rgba(54,34,56,.35)); }
 .card-art b { position: absolute; z-index: 1; top: 10px; left: 10px; padding: 4px 6px; background: var(--gold); color: white; font-size: 10px; font-weight: 700; }
-.card-art.no-art { display: grid; place-items: center; color: #d9b16a; font-size: 27px; }
+.card-art.no-art { display: grid; place-items: center; gap: 10px; color: #d9b16a; font-size: 27px; }
+.card-upload { display: grid; gap: 6px; width: calc(100% - 24px); font-size: 11px; }
+.card-upload .import-button { font-size: 10px; padding: 8px 10px; text-align: center; }
+.card-upload .card-image-url { width: 100%; padding: 7px 8px; border: 1px solid var(--line); background: #fffdf9; color: var(--ink); font-size: 10px; }
 .stars { position: absolute; z-index: 2; top: 8px; left: 50%; display: flex; gap: 1px; transform: translateX(-50%); }
 .star { padding: 0 2px; border: 0; background: transparent; color: rgba(255,255,255,.6); font-size: 18px; line-height: 1; text-shadow: 0 1px 2px #2c1718; }
 .star.lit { color: #f5c95d; }
