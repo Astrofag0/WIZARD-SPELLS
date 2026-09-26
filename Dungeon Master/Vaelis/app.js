@@ -95,8 +95,12 @@ async function loadRemoteSelections() {
 async function saveRemoteSelection(ownerId, spellId, changes) {
   const payload = { character_id: ownerId, spell_id: spellId, ...changes, updated_at: new Date().toISOString() };
   const response = await fetch(`${supabaseUrl}/rest/v1/spell_selections?on_conflict=character_id,spell_id`, { method: 'POST', headers: { ...supabaseHeaders, Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify(payload) });
-  if (!response.ok) throw new Error('No se pudo guardar la selección online');
+  if (!response.ok) throw new Error(await supabaseErrorMessage(response, 'No se pudo guardar la selección online'));
   remoteSelections[`${ownerId}:${spellId}`] = { ...remoteSelections[`${ownerId}:${spellId}`], ...payload };
+}
+async function supabaseErrorMessage(response, fallback) {
+  const detail = (await response.text()).trim();
+  return `${fallback} (HTTP ${response.status})${detail ? `: ${detail.slice(0, 400)}` : ''}`;
 }
 function typeKey(value) { const k = key(value); if (k.startsWith('dan')) return 'dano'; if (k.startsWith('efec')) return 'efecto'; return ''; }
 function typeLabel(value) { const k = typeKey(value); return k === 'dano' ? 'Daño' : k === 'efecto' ? 'Efecto' : ''; }
@@ -108,7 +112,7 @@ async function supaSelect(table, query) {
 async function supaUpsert(table, payload, conflictCols) {
   const url = `${supabaseUrl}/rest/v1/${table}${conflictCols ? `?on_conflict=${conflictCols}` : ''}`;
   const response = await fetch(url, { method: 'POST', headers: { ...supabaseHeaders, Prefer: `resolution=merge-duplicates,return=representation` }, body: JSON.stringify(payload) });
-  if (!response.ok) throw new Error(`No se pudo guardar en ${table}`);
+  if (!response.ok) throw new Error(await supabaseErrorMessage(response, `No se pudo guardar en ${table}`));
   return response.json();
 }
 async function supaDelete(table, match) {
@@ -501,17 +505,20 @@ if (setupAccess()) {
     if (event.target.closest('[data-edit-cancel]')) { state.editingSpellId = ''; render(); return; }
     const editSave = event.target.closest('[data-edit-save]');
     if (editSave) {
+      editSave.disabled = true;
+      editSave.textContent = 'Guardando...';
+      elements.status.textContent = 'Guardando los cambios del hechizo...';
       const [ownerId, spellId] = editSave.dataset.editSave.split(':');
       const card = editSave.closest('.spell-card');
       const fields = Object.fromEntries([...card.querySelectorAll('[data-edit-field]')].map(input => [input.dataset.editField, input.value.trim()]));
       const currentSpell = state.spells.find(spell => spell.owner === ownerId && spell.id === spellId);
-      if (!fields.name) { elements.status.textContent = 'El nombre del hechizo no puede quedar vacío'; return; }
+      if (!fields.name) { editSave.disabled = false; editSave.textContent = 'Guardar'; elements.status.textContent = 'El nombre del hechizo no puede quedar vacío'; return; }
       try {
         if (currentSpell.custom) {
           const rowId = spellId.replace(/^custom-/, '');
-          const [updated] = await supaUpsert('custom_spells', { id: rowId, owner: ownerId, name: fields.name, description: fields.description, type: currentSpell.type, level: fields.level, range: fields.range, effect: fields.dice, concentration: fields.concentration, duration: fields.duration, image: currentSpell.image }, 'id');
-          state.customSpells = state.customSpells.map(row => row.id === rowId ? updated : row);
-          state.spellCache[ownerId] = state.spellCache[ownerId] || [];
+          const payload = { id: rowId, owner: ownerId, name: fields.name, description: fields.description, type: currentSpell.type, level: fields.level, range: fields.range, effect: fields.dice, concentration: fields.concentration, duration: fields.duration, image: currentSpell.image };
+          const [updated] = await supaUpsert('custom_spells', payload, 'id');
+          state.customSpells = state.customSpells.map(row => row.id === rowId ? (updated || { ...row, ...payload }) : row);
           state.spells = state.spells.map(spell => spell.owner === ownerId && spell.id === spellId ? { ...spell, ...fields } : spell);
         } else {
           await saveRemoteSelection(ownerId, spellId, { spell_name: fields.name, spell_level: fields.level, spell_description: fields.description, spell_dice: fields.dice, spell_range: fields.range, spell_concentration: fields.concentration, spell_duration: fields.duration });
@@ -520,7 +527,11 @@ if (setupAccess()) {
         state.editingSpellId = '';
         render();
         elements.status.textContent = `Hechizo guardado: ${fields.name}`;
-      } catch (error) { elements.status.textContent = 'No se pudo guardar la edición del hechizo'; }
+      } catch (error) {
+        editSave.disabled = false;
+        editSave.textContent = 'Guardar';
+        elements.status.textContent = error.message || 'No se pudo guardar la edición del hechizo';
+      }
       return;
     }
     const deleteSpell = event.target.closest('[data-spell-delete]');
