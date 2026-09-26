@@ -15,7 +15,7 @@ const characters = {
 const characterId = sessionStorage.getItem(sessionKey);
 const character = characters[characterId];
 const selectionKey = `wizard-spells-selections-${characterId || 'guest'}`;
-const state = { spells: [], spellCache: {}, activeOwner: sessionStorage.getItem('wizard-spells-active-owner') || 'vaelis', ownerFilters: [], query: '', levels: [], types: [], imageOnly: false, selections: readJson(selectionKey), stars: readJson('wizard-spells-stars'), customSpells: [], characterLevels: {}, levelsEditor: { characterId: '', px: '', stars: {} } };
+const state = { spells: [], spellCache: {}, activeOwner: sessionStorage.getItem('wizard-spells-active-owner') || 'vaelis', ownerFilters: [], query: '', levels: [], types: [], imageOnly: false, selections: readJson(selectionKey), stars: readJson('wizard-spells-stars'), customSpells: [], characterLevels: {}, characterCoins: {}, coinDrafts: {}, editingSpellId: '', levelsEditor: { characterId: '', px: '', stars: {} } };
 const elements = {
   grid: document.querySelector('#spell-grid'), empty: document.querySelector('#empty-state'), count: document.querySelector('#spell-count'), status: document.querySelector('#source-status'), search: document.querySelector('#search'), level: document.querySelector('#level-filter'), levelSummary: document.querySelector('#level-summary'), characterFilter: document.querySelector('#character-filter'), characterSummary: document.querySelector('#character-summary'), reload: document.querySelector('#reload'), tabs: document.querySelector('#dm-tabs'), resetStars: document.querySelector('#reset-stars'), type: document.querySelector('#type-filter'), typeSummary: document.querySelector('#type-summary'), banner: document.querySelector('#level-banner')
 };
@@ -27,6 +27,56 @@ const imageFiles = {
   minerva: ['Burla Viciosa.png', 'Detectar Magia.png', 'Disguise Self.png', 'Encantar Persona.png', 'Enemies Abound.png', 'Garras de Mantis.png', 'Imagen Mayor.png', 'Inspiracion Bardica.png', 'Mordida de Mantis.png', 'Palabra Sanadora.png', 'Patron Hipnotico.png', 'Sugerencia - Suggestion.png', 'Susurros Disonantes.png']
 };
 function readJson(name) { try { return JSON.parse(localStorage.getItem(name) || '{}'); } catch { return {}; } }
+function openWorkbookCache() {
+  if (!window.indexedDB) return Promise.resolve(null);
+  return new Promise(resolve => {
+    let settled = false;
+    const timer = setTimeout(() => { settled = true; resolve(null); }, 1000);
+    let request;
+    try { request = indexedDB.open('wizard-spells-cache', 1); }
+    catch (error) { clearTimeout(timer); resolve(null); return; }
+    request.onupgradeneeded = () => { if (!request.result.objectStoreNames.contains('workbooks')) request.result.createObjectStore('workbooks'); };
+    request.onsuccess = () => { clearTimeout(timer); if (settled) request.result.close(); else { settled = true; resolve(request.result); } };
+    request.onerror = () => { clearTimeout(timer); if (!settled) { settled = true; resolve(null); } };
+  });
+}
+async function readCachedWorkbook(ownerId) {
+  const database = await openWorkbookCache();
+  if (!database) return null;
+  return new Promise(resolve => {
+    let settled = false;
+    const finish = value => { if (settled) return; settled = true; clearTimeout(timer); database.close(); resolve(value); };
+    const timer = setTimeout(() => finish(null), 1000);
+    try {
+      const request = database.transaction('workbooks', 'readonly').objectStore('workbooks').get(ownerId);
+      request.onsuccess = () => finish(request.result?.spells || null);
+      request.onerror = () => finish(null);
+    } catch (error) { finish(null); }
+  });
+}
+async function cacheWorkbook(ownerId, spells) {
+  const database = await openWorkbookCache();
+  if (!database) return;
+  return new Promise(resolve => {
+    const transaction = database.transaction('workbooks', 'readwrite');
+    transaction.objectStore('workbooks').put({ spells, savedAt: Date.now() }, ownerId);
+    transaction.oncomplete = () => { database.close(); resolve(); };
+    transaction.onerror = () => { database.close(); resolve(); };
+  });
+}
+async function loadWorkbook(ownerId, force = false) {
+  if (!force && state.spellCache[ownerId]) return state.spellCache[ownerId];
+  if (!force) {
+    const cached = await readCachedWorkbook(ownerId);
+    if (cached) { state.spellCache[ownerId] = cached; return cached; }
+  }
+  const owner = characters[ownerId];
+  const response = await fetch(`${owner.root}${owner.workbook}`, { cache: force ? 'reload' : 'default' });
+  if (!response.ok) throw new Error(owner.name);
+  state.spellCache[ownerId] = parseWorkbook(await response.arrayBuffer(), ownerId);
+  cacheWorkbook(ownerId, state.spellCache[ownerId]).catch(() => {});
+  return state.spellCache[ownerId];
+}
 function clean(value) { return String(value ?? '').trim(); }
 function key(value) { return clean(value).toLocaleLowerCase('es').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, ' ').trim(); }
 function escapeHtml(value) { return String(value).replace(/[&<>'"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[c])); }
@@ -36,21 +86,11 @@ const remoteSelections = {};
 function approvedByDungeonMaster(spell) { return remoteSelections[selectionId(spell)]?.approved_by_dm === true || readJson('wizard-spells-selections-dungeon-master')[selectionId(spell)] === true; }
 function selectedByUser(spell) { return remoteSelections[selectionId(spell)]?.selected_by_user === true || readJson(`wizard-spells-selections-${spell.owner}`)[selectionId(spell)] === true; }
 async function loadRemoteSelections() {
-  const response = await fetch(`${supabaseUrl}/rest/v1/spell_selections?select=character_id,spell_id,approved_by_dm,selected_by_user`, { headers: supabaseHeaders });
+  const fields = 'character_id,spell_id,approved_by_dm,selected_by_user,spell_type,spell_image,spell_name,spell_level,spell_description,spell_dice,spell_range,spell_concentration,spell_duration,is_deleted';
+  const response = await fetch(`${supabaseUrl}/rest/v1/spell_selections?select=${fields}`, { headers: supabaseHeaders });
   if (!response.ok) throw new Error('No se pudieron sincronizar las selecciones');
   const rows = await response.json();
   rows.forEach(row => { remoteSelections[`${row.character_id}:${row.spell_id}`] = row; });
-}
-async function ensureRemoteRows(spells) {
-  if (characterId !== 'dungeon-master') return;
-  const existing = new Set(Object.keys(remoteSelections));
-  const missing = spells.filter(spell => !existing.has(selectionId(spell))).map(spell => ({ character_id: spell.owner, spell_id: spell.id, approved_by_dm: false, selected_by_user: false }));
-  for (let index = 0; index < missing.length; index += 100) {
-    const batch = missing.slice(index, index + 100);
-    const response = await fetch(`${supabaseUrl}/rest/v1/spell_selections`, { method: 'POST', headers: { ...supabaseHeaders, Prefer: 'return=minimal' }, body: JSON.stringify(batch) });
-    if (!response.ok) throw new Error('No se pudieron crear todas las filas de selección');
-    batch.forEach(row => { remoteSelections[`${row.character_id}:${row.spell_id}`] = row; });
-  }
 }
 async function saveRemoteSelection(ownerId, spellId, changes) {
   const payload = { character_id: ownerId, spell_id: spellId, ...changes, updated_at: new Date().toISOString() };
@@ -82,13 +122,42 @@ async function loadCharacterLevels() {
   state.characterLevels = {};
   rows.forEach(row => { state.characterLevels[row.character_id] = { px_level: row.px_level, stars: typeof row.stars === 'string' ? JSON.parse(row.stars || '{}') : (row.stars || {}) }; });
 }
+const coinTypes = ['pc', 'pp', 'pe', 'po', 'ppt'];
+const coinRates = { pc: 1, pp: 10, pe: 50, po: 100, ppt: 1000 };
+function emptyCoinBalance() { return Object.fromEntries(coinTypes.map(type => [type, 0])); }
+function normalizeCoinBalance(row) {
+  return Object.fromEntries(coinTypes.map(type => [type, Math.max(0, Math.trunc(Number(row[type] ?? (type === 'pc' ? row.amount : 0)) || 0))]));
+}
+function coinTotal(balance) { return coinTypes.reduce((total, type) => total + (Number(balance[type]) || 0) * coinRates[type], 0); }
+function formatCoinBalance(balance) { return coinTypes.map(type => `${type.toUpperCase()} ${balance[type] || 0}`).join(' · '); }
+async function loadCharacterCoins() {
+  const rows = await supaSelect('character_coins', 'select=*').catch(() => []);
+  state.characterCoins = Object.fromEntries(rows.map(row => [row.character_id, normalizeCoinBalance(row)]));
+  Object.keys(characters).filter(id => id !== 'dungeon-master').forEach(id => {
+    state.coinDrafts[id] = { ...(state.characterCoins[id] || state.coinDrafts[id] || emptyCoinBalance()) };
+  });
+}
 function spellType(spell) { return remoteSelections[selectionId(spell)]?.spell_type || spell.type; }
 function spellImage(spell) { return spell.image || remoteSelections[selectionId(spell)]?.spell_image || ''; }
 function customSpellToShape(row) {
-  return { owner: row.owner, id: `custom-${row.id}`, name: row.name, level: row.level || 'Sin nivel', description: row.description || 'Sin descripción disponible.', dice: row.effect || '', range: row.range || '', concentration: row.concentration || '', duration: '', type: row.type || '', image: row.image || '', custom: true };
+  return { owner: row.owner, id: `custom-${row.id}`, name: row.name, level: row.level || 'Sin nivel', description: row.description || 'Sin descripción disponible.', dice: row.effect || '', range: row.range || '', concentration: row.concentration || '', duration: row.duration || '', type: row.type || '', image: row.image || '', custom: true };
 }
 function customSpellsFor(ownerId) { return state.customSpells.filter(row => row.owner === ownerId).map(customSpellToShape); }
-function composeSpells(owners) { return owners.flatMap(id => [...(state.spellCache[id] || []), ...customSpellsFor(id)]); }
+function applySpellOverrides(spell) {
+  const row = remoteSelections[selectionId(spell)] || {};
+  if (row.is_deleted) return null;
+  return {
+    ...spell,
+    name: row.spell_name ?? spell.name,
+    level: row.spell_level ?? spell.level,
+    description: row.spell_description ?? spell.description,
+    dice: row.spell_dice ?? spell.dice,
+    range: row.spell_range ?? spell.range,
+    concentration: row.spell_concentration ?? spell.concentration,
+    duration: row.spell_duration ?? spell.duration
+  };
+}
+function composeSpells(owners) { return owners.flatMap(id => [...(state.spellCache[id] || []), ...customSpellsFor(id)]).map(applySpellOverrides).filter(Boolean); }
 function englishTitle(value) {
   const text = clean(value).replace(/\.png$/i, '').trim();
   if (!text) return '';
@@ -171,9 +240,15 @@ function levelAllowance(ownerId, level) {
   return raw === undefined ? null : Number(raw) || 0;
 }
 function selectedCountForLevel(ownerId, level) { return state.spells.filter(s => s.owner === ownerId && key(s.level) === key(level) && selectedByUser(s)).length; }
-async function load() {
+async function load(forceWorkbooks = false) {
+  if (view === 'coins') {
+    try { await loadCharacterCoins(); renderCoinsView(); elements.status.textContent = 'Ranking actualizado'; }
+    catch (error) { elements.status.textContent = 'No se pudo cargar el ranking de monedas'; }
+    renderTabs();
+    return;
+  }
   if (view === 'levels' || view === 'create') {
-    try { await Promise.all([loadCharacterLevels(), loadCustomSpells()]); elements.status.textContent = 'Listo'; } catch (error) { elements.status.textContent = 'No se pudo sincronizar con Supabase'; }
+    try { await Promise.all([loadCharacterLevels(), loadCustomSpells(), ...(view === 'levels' ? [loadCharacterCoins()] : [])]); elements.status.textContent = 'Listo'; } catch (error) { elements.status.textContent = 'No se pudo sincronizar con Supabase'; }
     renderTabs();
     if (view === 'levels') renderLevelsEditor(); else renderCreateView();
     return;
@@ -181,18 +256,9 @@ async function load() {
   const owners = characterId === 'dungeon-master' && view === 'equipped'
     ? Object.keys(characters).filter(id => id !== 'dungeon-master')
     : [characterId === 'dungeon-master' ? state.activeOwner : characterId];
-  await Promise.all(owners.map(async ownerId => {
-    if (state.spellCache[ownerId]) return;
-    const owner = characters[ownerId];
-    const response = await fetch(`${owner.root}${owner.workbook}`);
-    if (!response.ok) throw new Error(owner.name);
-    state.spellCache[ownerId] = parseWorkbook(await response.arrayBuffer(), ownerId);
-  }));
-  try { await loadCustomSpells(); } catch (error) { /* opcional */ }
+  const workbookLoads = owners.map(ownerId => loadWorkbook(ownerId, forceWorkbooks));
+  await Promise.all([Promise.all(workbookLoads), loadCustomSpells(), loadRemoteSelections().catch(() => { elements.status.textContent = 'Modo local: no se pudo conectar con Supabase'; }), loadCharacterLevels().catch(() => {})]);
   state.spells = composeSpells(owners);
-  try { await loadRemoteSelections(); } catch (error) { elements.status.textContent = 'Modo local: no se pudo conectar con Supabase'; }
-  try { await ensureRemoteRows(state.spells); } catch (error) { elements.status.textContent = 'Supabase conectado parcialmente'; }
-  try { await loadCharacterLevels(); } catch (error) { /* opcional */ }
   if (characterId !== 'dungeon-master') { state.spells.forEach(spell => { const id = selectionId(spell); if (!(id in state.selections)) state.selections[id] = false; }); saveSelections(); }
   if (elements.level) populateLevels();
   if (elements.type) populateTypeFilter();
@@ -205,9 +271,7 @@ async function load() {
 async function refreshRemote() {
   if (view !== 'inventory' && view !== 'equipped') return;
   try {
-    await loadRemoteSelections();
-    await loadCustomSpells();
-    await loadCharacterLevels();
+    await Promise.all([loadRemoteSelections(), loadCustomSpells(), loadCharacterLevels()]);
     const owners = characterId === 'dungeon-master' && view === 'equipped'
       ? Object.keys(characters).filter(id => id !== 'dungeon-master')
       : [characterId === 'dungeon-master' ? state.activeOwner : characterId];
@@ -279,11 +343,15 @@ function render() {
     const descriptionMarkup = hasDescription ? `<p>${escapeHtml(spell.description)}</p><dl class="details">${spell.range ? `<div><dt>Alcance</dt><dd>${escapeHtml(spell.range)}</dd></div>` : ''}${spell.duration ? `<div><dt>Duración</dt><dd>${escapeHtml(spell.duration)}</dd></div>` : ''}${spell.dice ? `<div><dt>Efecto</dt><dd>${escapeHtml(spell.dice)}</dd></div>` : ''}</dl>` : '<p class="image-source-note">Información incluida en la imagen</p>';
     const currentType = spellType(spell);
     const type = typeKey(currentType);
-    const typeEditor = characterId === 'dungeon-master' && view === 'equipped' ? `<div class="choice type-choice"><button class="choice-button dano ${type === 'dano' ? 'selected' : ''}" data-type-owner="${spell.owner}" data-type-id="${escapeHtml(spell.id)}" data-type-value="dano">Daño</button><button class="choice-button efecto ${type === 'efecto' ? 'selected' : ''}" data-type-owner="${spell.owner}" data-type-id="${escapeHtml(spell.id)}" data-type-value="efecto">Efecto</button></div>` : '';
+    const canManage = characterId === 'dungeon-master' && view === 'inventory';
+    const typeEditor = characterId === 'dungeon-master' && (view === 'inventory' || view === 'equipped') ? `<div class="choice type-choice"><button class="choice-button dano ${type === 'dano' ? 'selected' : ''}" data-type-owner="${spell.owner}" data-type-id="${escapeHtml(spell.id)}" data-type-value="dano">Daño</button><button class="choice-button efecto ${type === 'efecto' ? 'selected' : ''}" data-type-owner="${spell.owner}" data-type-id="${escapeHtml(spell.id)}" data-type-value="efecto">Efecto</button></div>` : '';
     const image = spellImage(spell);
     const canUploadImage = characterId === 'dungeon-master' && view === 'inventory' && !image;
     const uploadMarkup = canUploadImage ? `<div class="card-upload"><label class="import-button">Subir imagen<input type="file" accept="image/*" class="card-image-input" data-image-owner="${spell.owner}" data-image-id="${escapeHtml(spell.id)}"></label><input type="text" class="card-image-url" placeholder="o pega una URL" data-image-owner="${spell.owner}" data-image-id="${escapeHtml(spell.id)}"></div>` : '';
-    return `<article class="spell-card"><div class="card-art ${image ? '' : 'no-art'}">${image ? `<img src="${image}" alt="" loading="lazy">` : `<span>✦</span>${uploadMarkup}`}<b>${escapeHtml(spell.level)}</b></div><div class="card-content"><h2>${escapeHtml(spell.name)}</h2>${descriptionMarkup}<div class="card-footer"><div class="tags">${type ? `<span class="type-tag ${type}">${typeLabel(currentType)}</span>` : ''}${characterId === 'dungeon-master' ? `<span class="owner-tag">${escapeHtml(characters[spell.owner].name)}</span>` : ''}</div>${typeEditor}${view !== 'equipped' ? `<div class="choice"><button class="choice-button yes ${choice ? 'selected' : ''}" data-spell-owner="${spell.owner}" data-spell-id="${escapeHtml(spell.id)}" data-spell-level="${escapeHtml(spell.level)}" data-choice="yes">Sí</button><button class="choice-button no ${!choice ? 'selected' : ''}" data-spell-owner="${spell.owner}" data-spell-id="${escapeHtml(spell.id)}" data-spell-level="${escapeHtml(spell.level)}" data-choice="no">No</button></div>` : ''}</div></div></article>`;
+    const editing = state.editingSpellId === selectionId(spell);
+    const editPanel = editing ? `<div class="spell-edit-form"><label>Nombre<input data-edit-field="name" value="${escapeHtml(spell.name)}"></label><label>Nivel<input data-edit-field="level" value="${escapeHtml(spell.level)}"></label><label>Descripción<textarea data-edit-field="description">${escapeHtml(spell.description)}</textarea></label><label>Efecto / tirada<input data-edit-field="dice" value="${escapeHtml(spell.dice)}"></label><label>Alcance<input data-edit-field="range" value="${escapeHtml(spell.range)}"></label><label>Concentración<input data-edit-field="concentration" value="${escapeHtml(spell.concentration)}"></label><label>Duración<input data-edit-field="duration" value="${escapeHtml(spell.duration)}"></label><div class="spell-edit-actions"><button type="button" class="login-button" data-edit-save="${spell.owner}:${escapeHtml(spell.id)}">Guardar</button><button type="button" class="ghost-button" data-edit-cancel>Cancelar</button></div></div>` : '';
+    const management = canManage ? `<div class="card-tools"><button type="button" class="spell-delete" data-spell-delete="${spell.owner}:${escapeHtml(spell.id)}" aria-label="Eliminar ${escapeHtml(spell.name)}" title="Eliminar hechizo">&#128465;</button><button type="button" class="spell-edit" data-edit-open="${spell.owner}:${escapeHtml(spell.id)}">Editar</button></div>` : '';
+    return `<article class="spell-card" data-card-id="${spell.owner}:${escapeHtml(spell.id)}"><div class="card-art ${image ? '' : 'no-art'}">${image ? `<img src="${image}" alt="" loading="lazy">` : `<span>✦</span>${uploadMarkup}`}<b>${escapeHtml(spell.level)}</b></div><div class="card-content"><div class="card-heading"><h2>${escapeHtml(spell.name)}</h2>${management}</div>${editing ? editPanel : descriptionMarkup}<div class="card-footer"><div class="tags">${type ? `<span class="type-tag ${type}">${typeLabel(currentType)}</span>` : ''}${characterId === 'dungeon-master' ? `<span class="owner-tag">${escapeHtml(characters[spell.owner].name)}</span>` : ''}</div>${typeEditor}${view !== 'equipped' ? `<div class="choice"><button class="choice-button yes ${choice ? 'selected' : ''}" data-spell-owner="${spell.owner}" data-spell-id="${escapeHtml(spell.id)}" data-spell-level="${escapeHtml(spell.level)}" data-choice="yes">Sí</button><button class="choice-button no ${!choice ? 'selected' : ''}" data-spell-owner="${spell.owner}" data-spell-id="${escapeHtml(spell.id)}" data-spell-level="${escapeHtml(spell.level)}" data-choice="no">No</button></div>` : ''}</div></div></article>`;
   }).join('');
   elements.empty.hidden = spells.length > 0;
 }
@@ -294,6 +362,11 @@ function renderLevelsEditor() {
   if (!editor.characterId) editor.characterId = owners[0];
   const saved = state.characterLevels[editor.characterId];
   if (editor.loadedFor !== editor.characterId) { editor.px = saved?.px_level ?? ''; editor.stars = { ...(saved?.stars || {}) }; editor.loadedFor = editor.characterId; }
+  const coinRows = owners.map(ownerId => {
+    const balance = state.coinDrafts[ownerId] || state.characterCoins[ownerId] || emptyCoinBalance();
+    const inputs = coinTypes.map(type => `<label>${type.toUpperCase()}<input aria-label="${type.toUpperCase()} de ${escapeHtml(characters[ownerId].name)}" data-coin-owner="${ownerId}" data-coin-type="${type}" type="number" min="0" step="1" value="${balance[type] || 0}"></label>`).join('');
+    return `<div class="coin-edit-row"><strong>${escapeHtml(characters[ownerId].name)}</strong><div class="coin-values">${inputs}</div><button type="button" class="login-button" data-coin-save="${ownerId}">Guardar</button></div>`;
+  }).join('');
   elements.grid.innerHTML = `
     <section class="levels-panel">
       <label class="levels-field">Personaje
@@ -309,7 +382,8 @@ function renderLevelsEditor() {
         <button id="levels-save" class="login-button" type="button">Guardar</button>
         <button id="levels-delete" class="ghost-button" type="button">Borrar</button>
       </div>
-    </section>`;
+    </section>
+    <section class="coin-editor-panel"><h2>Monedas por personaje</h2><div class="coin-editor-list">${coinRows}</div></section>`;
   elements.empty.hidden = true;
   document.querySelector('#levels-character').addEventListener('change', event => { editor.characterId = event.target.value; renderLevelsEditor(); });
   document.querySelector('#levels-px').addEventListener('input', event => { editor.px = event.target.value; });
@@ -331,6 +405,28 @@ function renderLevelsEditor() {
   document.querySelector('#levels-delete').addEventListener('click', async () => {
     try { await supaDelete('character_levels', { character_id: editor.characterId }); delete state.characterLevels[editor.characterId]; editor.px = ''; editor.stars = {}; renderLevelsEditor(); elements.status.textContent = 'Niveles borrados'; } catch (error) { elements.status.textContent = 'No se pudo borrar en Supabase'; }
   });
+  elements.grid.querySelectorAll('[data-coin-type]').forEach(input => input.addEventListener('input', () => {
+    const ownerId = input.dataset.coinOwner;
+    state.coinDrafts[ownerId] = { ...(state.coinDrafts[ownerId] || emptyCoinBalance()), [input.dataset.coinType]: input.value };
+  }));
+  elements.grid.querySelectorAll('[data-coin-save]').forEach(button => button.addEventListener('click', async () => {
+    const ownerId = button.dataset.coinSave;
+    const balance = Object.fromEntries(coinTypes.map(type => [type, Math.max(0, Math.trunc(Number(document.querySelector(`[data-coin-owner="${ownerId}"][data-coin-type="${type}"]`).value) || 0))]));
+    try {
+      await supaUpsert('character_coins', { character_id: ownerId, ...balance, amount: coinTotal(balance), updated_at: new Date().toISOString() }, 'character_id');
+      state.characterCoins[ownerId] = balance;
+      state.coinDrafts[ownerId] = { ...balance };
+      elements.status.textContent = `Monedas guardadas: ${characters[ownerId].name}`;
+    } catch (error) { elements.status.textContent = 'No se pudieron guardar las monedas'; }
+  }));
+}
+function renderCoinsView() {
+  const owners = Object.keys(characters).filter(id => id !== 'dungeon-master');
+  const ranking = owners.sort((left, right) => coinTotal(state.characterCoins[right] || emptyCoinBalance()) - coinTotal(state.characterCoins[left] || emptyCoinBalance()) || characters[left].name.localeCompare(characters[right].name, 'es'));
+  const ownBalance = state.characterCoins[characterId] || emptyCoinBalance();
+  const balance = characterId === 'dungeon-master' ? '' : `<section class="coin-balance"><p>Saldo de ${escapeHtml(characters[characterId].name)}</p><div class="coin-denominations">${coinTypes.map(type => `<div><span>${type.toUpperCase()}</span><strong>${ownBalance[type] || 0}</strong></div>`).join('')}</div></section>`;
+  elements.grid.innerHTML = `${balance}<section class="coin-ranking-panel"><h2>Ranking de monedas</h2><ol class="coin-ranking">${ranking.map((ownerId, index) => `<li><span class="coin-rank">${index + 1}</span><strong>${escapeHtml(characters[ownerId].name)}</strong><span class="coin-ranking-value">${characterId === 'luxxxi' ? formatCoinBalance(state.characterCoins[ownerId] || emptyCoinBalance()) : '•••'}</span></li>`).join('')}</ol></section>`;
+  elements.empty.hidden = true;
 }
 function onCreateFileChange(event) { const file = event.target.files?.[0]; if (!file) return; const reader = new FileReader(); reader.onload = () => { state.createForm.image = reader.result; renderCreateView(); }; reader.readAsDataURL(file); }
 function renderCreateView() {
@@ -397,9 +493,54 @@ if (setupAccess()) {
   elements.level?.addEventListener('change', event => { const input = event.target.closest('input'); if (!input) return; const all = [...elements.level.querySelectorAll('input')]; if (input.value === 'all' && input.checked) all.filter(i => i !== input).forEach(i => { i.checked = false; }); if (input.value !== 'all' && input.checked) all.find(i => i.value === 'all').checked = false; state.imageOnly = Boolean(all.find(i => i.value === 'image')?.checked); state.levels = all.filter(i => i.checked && i.value !== 'all' && i.value !== 'image').map(i => i.value); render(); });
   elements.type?.addEventListener('change', event => { const input = event.target.closest('input'); if (!input) return; state.types = input.value ? [input.value] : []; updateTypeSummary(); render(); });
   elements.characterFilter?.addEventListener('change', event => { const input = event.target.closest('input'); if (!input) return; const all = [...elements.characterFilter.querySelectorAll('input')]; if (input.value === 'all' && input.checked) all.filter(item => item !== input).forEach(item => { item.checked = false; }); if (input.value !== 'all' && input.checked) all.find(item => item.value === 'all').checked = false; state.ownerFilters = all.filter(item => item.checked && item.value !== 'all').map(item => item.value); updateCharacterSummary(); render(); });
-  elements.reload?.addEventListener('click', () => { state.spellCache = {}; load(); });
+  elements.reload?.addEventListener('click', () => { state.spellCache = {}; load(true); });
   elements.resetStars?.addEventListener('click', () => { state.stars = {}; localStorage.setItem('wizard-spells-stars', '{}'); if (view === 'slots') renderSlots(); else render(); });
   elements.grid?.addEventListener('click', async event => {
+    const editOpen = event.target.closest('[data-edit-open]');
+    if (editOpen) { state.editingSpellId = editOpen.dataset.editOpen; render(); return; }
+    if (event.target.closest('[data-edit-cancel]')) { state.editingSpellId = ''; render(); return; }
+    const editSave = event.target.closest('[data-edit-save]');
+    if (editSave) {
+      const [ownerId, spellId] = editSave.dataset.editSave.split(':');
+      const card = editSave.closest('.spell-card');
+      const fields = Object.fromEntries([...card.querySelectorAll('[data-edit-field]')].map(input => [input.dataset.editField, input.value.trim()]));
+      const currentSpell = state.spells.find(spell => spell.owner === ownerId && spell.id === spellId);
+      if (!fields.name) { elements.status.textContent = 'El nombre del hechizo no puede quedar vacío'; return; }
+      try {
+        if (currentSpell.custom) {
+          const rowId = spellId.replace(/^custom-/, '');
+          const [updated] = await supaUpsert('custom_spells', { id: rowId, owner: ownerId, name: fields.name, description: fields.description, type: currentSpell.type, level: fields.level, range: fields.range, effect: fields.dice, concentration: fields.concentration, duration: fields.duration, image: currentSpell.image }, 'id');
+          state.customSpells = state.customSpells.map(row => row.id === rowId ? updated : row);
+          state.spellCache[ownerId] = state.spellCache[ownerId] || [];
+          state.spells = state.spells.map(spell => spell.owner === ownerId && spell.id === spellId ? { ...spell, ...fields } : spell);
+        } else {
+          await saveRemoteSelection(ownerId, spellId, { spell_name: fields.name, spell_level: fields.level, spell_description: fields.description, spell_dice: fields.dice, spell_range: fields.range, spell_concentration: fields.concentration, spell_duration: fields.duration });
+          state.spells = state.spells.map(applySpellOverrides).filter(Boolean);
+        }
+        state.editingSpellId = '';
+        render();
+        elements.status.textContent = `Hechizo guardado: ${fields.name}`;
+      } catch (error) { elements.status.textContent = 'No se pudo guardar la edición del hechizo'; }
+      return;
+    }
+    const deleteSpell = event.target.closest('[data-spell-delete]');
+    if (deleteSpell) {
+      const [ownerId, spellId] = deleteSpell.dataset.spellDelete.split(':');
+      const currentSpell = state.spells.find(spell => spell.owner === ownerId && spell.id === spellId);
+      if (!currentSpell || !confirm(`¿Eliminar definitivamente «${currentSpell.name}» del inventario de ${characters[ownerId].name}?`)) return;
+      try {
+        if (currentSpell.custom) {
+          await supaDelete('custom_spells', { id: spellId.replace(/^custom-/, '') });
+          state.customSpells = state.customSpells.filter(row => row.id !== spellId.replace(/^custom-/, ''));
+        } else {
+          await saveRemoteSelection(ownerId, spellId, { is_deleted: true });
+        }
+        state.spells = state.spells.filter(spell => !(spell.owner === ownerId && spell.id === spellId));
+        render();
+        elements.status.textContent = `Hechizo eliminado: ${currentSpell.name}`;
+      } catch (error) { elements.status.textContent = 'No se pudo eliminar el hechizo'; }
+      return;
+    }
     const typeChoice = event.target.closest('[data-type-owner]');
     if (typeChoice) {
       const ownerId = typeChoice.dataset.typeOwner; const spellId = typeChoice.dataset.typeId; const value = typeChoice.dataset.typeValue;

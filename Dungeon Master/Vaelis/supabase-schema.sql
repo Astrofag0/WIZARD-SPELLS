@@ -5,6 +5,14 @@
 -- 1) Tipo de hechizo por tarjeta: el Dungeon Master lo fija desde "Hechizos equipados" y se refleja
 --    en el resto de pestañas/usuarios para ese mismo hechizo.
 alter table spell_selections add column if not exists spell_type text;
+alter table spell_selections add column if not exists spell_name text;
+alter table spell_selections add column if not exists spell_level text;
+alter table spell_selections add column if not exists spell_description text;
+alter table spell_selections add column if not exists spell_dice text;
+alter table spell_selections add column if not exists spell_range text;
+alter table spell_selections add column if not exists spell_concentration text;
+alter table spell_selections add column if not exists spell_duration text;
+alter table spell_selections add column if not exists is_deleted boolean not null default false;
 
 -- 1b) Imagen por hechizo: el Dungeon Master la sube (o pega una URL) desde la pestaña de cada
 --     personaje cuando la tarjeta no tiene imagen, y se refleja para todos los usuarios.
@@ -32,9 +40,28 @@ create table if not exists custom_spells (
   range text,
   effect text,
   concentration text,
+  duration text,
   image text,
   created_at timestamptz not null default now()
 );
+alter table custom_spells add column if not exists duration text;
+
+-- 4) Saldos de monedas controlados por el Dungeon Master, uno por personaje.
+create table if not exists character_coins (
+  character_id text primary key,
+  amount bigint not null default 0 check (amount >= 0),
+  updated_at timestamptz not null default now()
+);
+alter table character_coins add column if not exists pc bigint not null default 0 check (pc >= 0);
+alter table character_coins add column if not exists pp bigint not null default 0 check (pp >= 0);
+alter table character_coins add column if not exists pe bigint not null default 0 check (pe >= 0);
+alter table character_coins add column if not exists po bigint not null default 0 check (po >= 0);
+alter table character_coins add column if not exists ppt bigint not null default 0 check (ppt >= 0);
+
+-- Al actualizar una instalación anterior, conserva el saldo sin denominación como PC.
+update character_coins
+set pc = amount
+where amount > 0 and pc = 0 and pp = 0 and pe = 0 and po = 0 and ppt = 0;
 
 -- Habilitar Realtime (opcional, recomendado) para reflejar los cambios sin esperar el sondeo de 5s de la app:
 -- En el Table Editor de Supabase, abre cada tabla (character_levels, custom_spells, spell_selections)
@@ -44,10 +71,14 @@ create table if not exists custom_spells (
 -- Ajusta estas políticas según tus necesidades de seguridad; están pensadas para un grupo cerrado de jugadores de confianza.
 alter table character_levels enable row level security;
 alter table custom_spells enable row level security;
+alter table character_coins enable row level security;
 
 drop policy if exists "character_levels anon all" on character_levels;
 create policy "character_levels anon all" on character_levels for all to anon using (true) with check (true);
 
 drop policy if exists "custom_spells anon all" on custom_spells;
 create policy "custom_spells anon all" on custom_spells for all to anon using (true) with check (true);
+
+drop policy if exists "character_coins anon all" on character_coins;
+create policy "character_coins anon all" on character_coins for all to anon using (true) with check (true);
 

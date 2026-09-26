@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Wizard Spells | Monedas</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body data-view="coins">
+  <section id="login-screen" class="login-screen">
+    <div class="login-panel">
+      <div class="sigil" aria-hidden="true">✦</div>
+      <p class="eyebrow">Acceso al grimorio</p>
+      <h1>Elige tu personaje</h1>
+      <p>Introduce la clave que te corresponde para consultar tus hechizos.</p>
+      <form id="login-form">
+        <label>Personaje<select id="character-select" required><option value="">Selecciona un personaje</option><option value="frederick">Frederick D´Rosectta</option><option value="jeanne">Jeanne Di Arc</option><option value="luxxxi">Luxxxi Fernando</option><option value="minerva">Minerva Di Coleoptera</option><option value="viko">Viko</option><option value="vaelis">Vaelis</option><option value="dungeon-master">Dungeon Master</option></select></label>
+        <label>Clave de acceso<input id="access-key" type="password" autocomplete="current-password" required></label>
+        <button class="login-button" type="submit">Entrar al grimorio</button>
+        <p id="login-error" class="login-error" role="alert" hidden>La clave no coincide con el personaje.</p>
+      </form>
+    </div>
+  </section>
+  <main class="page-shell">
+    <header class="hero">
+      <div class="sigil" aria-hidden="true">✦</div>
+      <p class="eyebrow">Tesoro de la compañía</p>
+      <h1>Monedas</h1>
+      <p class="intro">Consulta tu saldo y la posición de cada personaje en el ranking.</p>
+      <div class="hero-rule" aria-hidden="true"><span></span><i>◇</i><span></span></div>
+    </header>
+    <nav class="page-nav" aria-label="Navegación de páginas">
+      <a class="nav-link" href="index.html">Inventario</a>
+      <a class="nav-link" href="grimorio equipado.html">Grimorio equipado</a>
+      <a class="nav-link active coins-nav" href="monedas.html">Monedas</a>
+      <div id="dm-tabs" class="dm-tabs" aria-label="Pestañas del Dungeon Master"></div>
+      <span id="character-name" class="character-name"></span><button id="logout" class="logout-button" type="button">Salir</button>
+    </nav>
+    <section class="status-row" aria-live="polite"><div></div><div id="source-status" class="source-status">Cargando ranking...</div></section>
+    <section id="spell-grid" class="coin-view" aria-live="polite"></section>
+    <div id="empty-state" class="empty-state" hidden></div>
+  </main>
+  <footer>Los saldos los asigna el Dungeon Master desde Niveles Personaje</footer>
+  <script src="app.js"></script>
+</body>
+</html>

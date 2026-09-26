@@ -36,7 +36,7 @@ h1 { margin: 0; color: var(--plum-dark); font-size: clamp(35px, 5vw, 62px); font
 .hero-rule { display: flex; align-items: center; gap: 13px; width: min(290px, 70%); margin: 0 auto 53px; color: var(--gold); }
 .hero-rule span { height: 1px; flex: 1; background: var(--line); }
 .hero-rule i { font-style: normal; font-size: 13px; }
-.page-nav { display: flex; justify-content: center; gap: 8px; margin: 0 auto 28px; }
+.page-nav { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 8px; margin: 0 auto 28px; }
 .nav-link { padding: 9px 16px; color: var(--plum); border: 1px solid transparent; font-size: 12px; font-weight: 700; text-decoration: none; }
 .nav-link.active { color: #fff; background: var(--plum); border-color: var(--plum); }
 .nav-link span { display: inline-grid; min-width: 18px; height: 18px; margin-left: 5px; padding: 0 4px; place-items: center; color: var(--plum); background: #f3e2dc; border-radius: 50%; font-size: 10px; }
@@ -94,7 +94,18 @@ body.dm-mode.equipped-mode .dm-only { display: inline-block; }
 .star { padding: 0 2px; border: 0; background: transparent; color: rgba(255,255,255,.6); font-size: 18px; line-height: 1; text-shadow: 0 1px 2px #2c1718; }
 .star.lit { color: #f5c95d; }
 .card-content { display: flex; flex-direction: column; padding: 19px 17px 15px; }
+.card-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
 .card-content h2 { margin: 0 0 9px; color: var(--plum); font-size: 17px; line-height: 1.25; font-weight: 600; }
+.card-tools { display: grid; justify-items: end; gap: 3px; flex: 0 0 auto; }
+.spell-delete { width: 30px; height: 28px; padding: 2px; color: var(--plum); border-color: transparent; background: transparent; font-size: 19px; line-height: 1; }
+.spell-delete:hover { color: #fff; border-color: var(--plum); background: var(--plum); }
+.spell-edit { padding: 4px 7px; font-size: 10px; }
+.spell-edit-form { display: grid; gap: 7px; }
+.spell-edit-form label { display: grid; gap: 3px; color: var(--gold); font-size: 9px; font-weight: 700; }
+.spell-edit-form input, .spell-edit-form textarea { width: 100%; min-width: 0; padding: 6px; border: 1px solid var(--line); background: #fffdf9; font: 11px 'DM Sans', sans-serif; }
+.spell-edit-form textarea { min-height: 58px; resize: vertical; }
+.spell-edit-actions { display: flex; flex-wrap: wrap; gap: 5px; }
+.spell-edit-actions button { padding: 7px 9px; font-size: 10px; }
 .card-content p { flex: 1; margin: 0; color: var(--muted); font-size: 12px; line-height: 1.55; }
 .details { display: flex; flex-wrap: wrap; gap: 8px 14px; margin: 14px 0 13px; }
 .details div { min-width: 55px; }
@@ -131,6 +142,27 @@ body.dm-mode .page-nav { justify-content: flex-end; }
 .levels-row .slot-stars .star { position: static; color: #a99b94; text-shadow: none; }
 .levels-row .slot-stars .star.lit { color: #c18b32; }
 .levels-actions { display: flex; gap: 10px; }
+.coin-editor-panel, .coin-ranking-panel, .coin-balance { padding: 22px; background: var(--panel); border: 1px solid var(--line); border-top: 3px solid var(--gold); }
+.coin-editor-panel h2, .coin-ranking-panel h2 { margin: 0 0 14px; color: var(--plum); font-size: 20px; }
+.coin-editor-list { display: grid; gap: 8px; }
+.coin-edit-row { display: grid; grid-template-columns: minmax(145px, 200px) minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 9px 12px; border: 1px solid var(--line); background: rgba(243, 226, 220, .5); }
+.coin-edit-row strong { color: var(--plum-dark); font: 600 13px 'Cinzel', serif; }
+.coin-values { display: grid; grid-template-columns: repeat(5, minmax(52px, 1fr)); gap: 6px; }
+.coin-values label { display: grid; gap: 3px; color: var(--gold); font-size: 9px; font-weight: 700; }
+.coin-edit-row input { width: 100%; min-width: 0; padding: 8px 5px; border: 1px solid var(--line); background: #fffdf9; }
+.coin-edit-row button { padding: 8px 12px; }
+.coin-view { display: grid; gap: 20px; max-width: 720px; margin: 0 auto; }
+.coin-balance { display: grid; gap: 14px; border-color: var(--line); border-top-color: var(--plum); }
+.coin-balance p { margin: 0; color: var(--plum); font: 600 17px 'Cinzel', serif; }
+.coin-denominations { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 9px; }
+.coin-denominations div { display: grid; gap: 5px; padding: 10px; border: 1px solid var(--line); background: rgba(243, 226, 220, .5); }
+.coin-denominations span { color: var(--gold); font-size: 10px; font-weight: 700; }
+.coin-denominations strong { color: var(--plum); font: 700 22px 'Cinzel', serif; }
+.coin-ranking { display: grid; gap: 7px; margin: 0; padding: 0; list-style: none; }
+.coin-ranking li { display: grid; grid-template-columns: 38px 1fr minmax(90px, auto); align-items: center; gap: 12px; min-height: 48px; padding: 7px 12px; border: 1px solid var(--line); background: rgba(243, 226, 220, .5); }
+.coin-rank { color: var(--gold); font: 700 15px 'Cinzel', serif; }
+.coin-ranking li strong { color: var(--plum-dark); font-size: 13px; }
+.coin-ranking-value { color: var(--muted); font-size: 11px; overflow-wrap: anywhere; text-align: right; }
 .spell-form { grid-template-columns: 220px 1fr; }
 .spell-form .import-button { position: absolute; z-index: 2; left: 10px; right: 10px; bottom: 10px; text-align: center; }
 .spell-form .card-content { gap: 10px; }
@@ -146,4 +178,4 @@ footer { position: relative; padding: 19px; color: var(--muted); border-top: 1px
 footer strong { color: var(--plum); }
 @keyframes rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 @media (max-width: 850px) { .spell-grid { grid-template-columns: repeat(2, 1fr); } }
-@media (max-width: 600px) { .page-shell { width: min(100% - 26px, 480px); padding-top: 42px; } .hero-rule { margin-bottom: 35px; } .toolbar { flex-wrap: wrap; } .search-box { flex-basis: 100%; } .level-menu { min-width: 140px; } .spell-grid, .slot-grid { grid-template-columns: 1fr; } .spell-card { grid-template-columns: 155px 1fr; } .card-art img { min-height: 250px; } .status-row { align-items: flex-end; } .source-status { max-width: 180px; } .ghost-button span { display: none; } }
+@media (max-width: 600px) { .page-shell { width: min(100% - 26px, 480px); padding-top: 42px; } .hero-rule { margin-bottom: 35px; } .toolbar { flex-wrap: wrap; } .search-box { flex-basis: 100%; } .level-menu { min-width: 140px; } .spell-grid, .slot-grid { grid-template-columns: 1fr; } .spell-card { grid-template-columns: 155px 1fr; } .card-content { min-width: 0; padding: 13px 10px; } .card-art img { min-height: 250px; } .status-row { align-items: flex-end; } .source-status { max-width: 180px; } .ghost-button span { display: none; } .coin-edit-row { grid-template-columns: minmax(0, 1fr) auto; } .coin-values { grid-column: 1 / -1; grid-template-columns: repeat(5, minmax(0, 1fr)); } .coin-edit-row button { grid-column: 1 / -1; } .coin-values input { padding: 7px 2px; font-size: 11px; } .coin-denominations { gap: 5px; } .coin-denominations div { padding: 7px 4px; } .coin-denominations strong { font-size: 18px; } .coin-ranking li { grid-template-columns: 28px minmax(0, 1fr) minmax(54px, auto); gap: 8px; padding-inline: 8px; } .coin-ranking li strong { overflow-wrap: anywhere; font-size: 12px; } }
