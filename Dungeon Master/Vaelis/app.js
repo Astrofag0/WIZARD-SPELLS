@@ -274,8 +274,10 @@ async function load(forceWorkbooks = false) {
 }
 async function refreshRemote() {
   if (view !== 'inventory' && view !== 'equipped') return;
+  if (state.editingSpellId) return;
   try {
     await Promise.all([loadRemoteSelections(), loadCustomSpells(), loadCharacterLevels()]);
+    if (state.editingSpellId) return;
     const owners = characterId === 'dungeon-master' && view === 'equipped'
       ? Object.keys(characters).filter(id => id !== 'dungeon-master')
       : [characterId === 'dungeon-master' ? state.activeOwner : characterId];
